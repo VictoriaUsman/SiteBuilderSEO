@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>AI SEO Site Builder</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; padding: 2rem; }
+    h1 { font-size: 1.75rem; font-weight: 700; color: #38bdf8; margin-bottom: 0.25rem; }
+    .subtitle { color: #64748b; margin-bottom: 2rem; }
+    .card { background: #1e293b; border: 1px solid #334155; border-radius: 0.75rem; padding: 1.5rem; margin-bottom: 1.5rem; }
+    label { display: block; font-size: 0.875rem; color: #94a3b8; margin-bottom: 0.25rem; margin-top: 1rem; }
+    input, select { width: 100%; padding: 0.5rem 0.75rem; background: #0f172a; border: 1px solid #334155; border-radius: 0.5rem; color: #e2e8f0; font-size: 0.9rem; }
+    input[type="file"] { padding: 0.4rem; }
+    .btn { display: inline-block; margin-top: 1.25rem; padding: 0.6rem 1.5rem; background: #38bdf8; color: #0f172a; border: none; border-radius: 0.5rem; font-weight: 700; cursor: pointer; font-size: 0.95rem; }
+    .btn:hover { background: #7dd3fc; }
+    .row { display: flex; gap: 1rem; }
+    .row > div { flex: 1; }
+    #status { margin-top: 1.5rem; }
+    .log-box { background: #0f172a; border: 1px solid #334155; border-radius: 0.5rem; padding: 1rem; font-family: monospace; font-size: 0.8rem; max-height: 300px; overflow-y: auto; white-space: pre-wrap; color: #86efac; }
+    .badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
+    .badge-done { background: #14532d; color: #86efac; }
+    .badge-running { background: #1e3a5f; color: #7dd3fc; }
+    .badge-failed { background: #450a0a; color: #fca5a5; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+    th { text-align: left; padding: 0.5rem; color: #64748b; border-bottom: 1px solid #334155; }
+    td { padding: 0.5rem; border-bottom: 1px solid #1e293b; }
+    a { color: #38bdf8; }
+    .check { color: #86efac; } .cross { color: #fca5a5; }
+  </style>
+</head>
+<body>
+
+<h1>AI SEO Site Builder</h1>
+<p class="subtitle">Generate and publish local SEO pages at scale</p>
+
+<div class="card">
+  <form id="genForm">
+    <label>Keyword CSV</label>
+    <input type="file" name="csv_file" accept=".csv" required>
+
+    <div class="row">
+      <div>
+        <label>Domain</label>
+        <input type="text" name="domain" placeholder="bestroofingdallas.com" required>
+      </div>
+      <div>
+        <label>AI Provider</label>
+        <select name="provider">
+          <option value="gemini">Gemini</option>
+          <option value="openai">OpenAI</option>
+        </select>
+      </div>
+      <div>
+        <label>Publish Status</label>
+        <select name="status">
+          <option value="draft">Draft</option>
+          <option value="publish">Publish</option>
+        </select>
+      </div>
+    </div>
+
+    <label style="display:flex;align-items:center;gap:0.5rem;margin-top:1rem;">
+      <input type="checkbox" name="dry_run" style="width:auto"> Dry run (no upload)
+    </label>
+
+    <button type="submit" class="btn">Generate Site</button>
+  </form>
+</div>
+
+<div id="status" style="display:none">
+  <div class="card">
+    <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:1rem;">
+      <strong>Job <span id="jobId"></span></strong>
+      <span id="jobBadge" class="badge badge-running">running</span>
+    </div>
+    <div class="log-box" id="logBox"></div>
+    <div id="pagesTable" style="margin-top:1rem;display:none">
+      <table><thead><tr><th>Slug</th><th>URL</th><th>Valid</th></tr></thead>
+      <tbody id="pagesBody"></tbody></table>
+    </div>
+  </div>
+</div>
+
+{% if jobs %}
+<div class="card">
+  <strong style="color:#94a3b8">Previous Jobs</strong>
+  <table style="margin-top:0.75rem">
+    <thead><tr><th>ID</th><th>Domain</th><th>Status</th><th>Pages</th></tr></thead>
+    <tbody>
+    {% for j in jobs %}
+      <tr>
+        <td>{{ j.id }}</td>
+        <td>{{ j.domain }}</td>
+        <td><span class="badge badge-{{ j.status }}">{{ j.status }}</span></td>
+        <td>{{ j.pages|length }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<script>
+const form = document.getElementById('genForm');
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fd = new FormData(form);
+  fd.set('dry_run', form.querySelector('[name=dry_run]').checked);
+
+  const res = await fetch('/generate', { method: 'POST', body: fd });
+  const data = await res.json();
+  const jobId = data.job_id;
+
+  document.getElementById('status').style.display = 'block';
+  document.getElementById('jobId').textContent = jobId;
+
+  poll(jobId);
+});
+
+async function poll(jobId) {
+  const res = await fetch(`/jobs/${jobId}`);
+  const job = await res.json();
+
+  document.getElementById('logBox').textContent = job.logs.join('\n');
+  const badge = document.getElementById('jobBadge');
+  badge.textContent = job.status;
+  badge.className = `badge badge-${job.status}`;
+
+  if (job.pages.length) {
+    const table = document.getElementById('pagesTable');
+    const tbody = document.getElementById('pagesBody');
+    table.style.display = 'block';
+    tbody.innerHTML = job.pages.map(p =>
+      `<tr><td>${p.slug}</td><td><a href="${p.url}" target="_blank">${p.url}</a></td>
+       <td>${p.valid ? '<span class="check">✓</span>' : '<span class="cross">✗</span>'}</td></tr>`
+    ).join('');
+  }
+
+  if (job.status === 'running') setTimeout(() => poll(jobId), 2000);
+}
+</script>
+</body>
+</html>

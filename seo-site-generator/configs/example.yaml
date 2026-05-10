@@ -1,0 +1,25 @@
+# Site configuration — run: python build_site.py configs/example.yaml
+
+site:
+  domain: bestroofingdallas.com
+  name: Best Roofing Dallas
+  city: Dallas
+  state: TX
+  service: Roof Repair
+
+# Override .env credentials for this specific site (optional)
+wordpress:
+  url: https://bestroofingdallas.com
+  username: admin
+  app_password: "xxxx xxxx xxxx xxxx xxxx xxxx"
+
+ai:
+  provider: gemini   # gemini | openai
+
+publishing:
+  status: publish    # publish | draft
+  create_parent_page: true
+  parent_page_title: "Services"
+
+# Optional: override CSV for this config
+csv_file: configs/dallas_roofing.csv
