@@ -35,8 +35,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
             </NavLink>
           ))}
         </nav>
-        <div className="p-4 border-t border-slate-800 text-xs text-slate-600">
-          AI Local SEO Builder v1.0
+        <div className="p-4 border-t border-slate-800 text-xs space-y-0.5">
+          <p className="text-slate-500">AI Local SEO Builder v1.0</p>
+          <p className="text-slate-600">Built by <span className="text-slate-400 font-medium">Ian Tristan Cultura</span></p>
         </div>
       </aside>
 
