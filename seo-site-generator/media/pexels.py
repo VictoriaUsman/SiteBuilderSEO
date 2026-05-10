@@ -10,13 +10,14 @@ PEXELS_API_KEY = os.getenv("PEXELS_API_KEY")
 OUTPUT_DIR = Path("output/images")
 
 
-def search_image(query: str) -> dict | None:
-    if not PEXELS_API_KEY:
-        raise ValueError("PEXELS_API_KEY not set in .env")
+def search_image(query: str, api_key: str = None) -> dict | None:
+    key = api_key or PEXELS_API_KEY
+    if not key:
+        raise ValueError("PEXELS_API_KEY not set")
 
     resp = requests.get(
         "https://api.pexels.com/v1/search",
-        headers={"Authorization": PEXELS_API_KEY},
+        headers={"Authorization": key},
         params={"query": query, "per_page": 5, "orientation": "landscape"},
         timeout=15,
     )
@@ -42,8 +43,8 @@ def download_image(photo: dict, service: str, city: str) -> Path:
     return filename
 
 
-def fetch_image(query: str, service: str, city: str) -> Path | None:
-    photo = search_image(query)
+def fetch_image(query: str, service: str, city: str, api_key: str = None) -> Path | None:
+    photo = search_image(query, api_key=api_key)
     if not photo:
         return None
     return download_image(photo, service, city)

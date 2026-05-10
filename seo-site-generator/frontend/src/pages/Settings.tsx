@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Save, Eye, EyeOff, CheckCircle } from 'lucide-react'
 
 interface Field {
@@ -19,7 +19,7 @@ const SECTIONS: Section[] = [
     heading: 'WordPress.com',
     fields: [
       { key: 'WP_ACCESS_TOKEN', label: 'OAuth Access Token', placeholder: 'Paste token from authorize URL', secret: true, hint: 'Get from: public-api.wordpress.com/oauth2/authorize' },
-      { key: 'WP_SITE', label: 'Site domain', placeholder: 'allaroundph.wordpress.com' },
+      { key: 'WP_SITE', label: 'Site domain', placeholder: 'yoursite.wordpress.com' },
     ],
   },
   {
@@ -40,80 +40,91 @@ const SECTIONS: Section[] = [
   },
 ]
 
+const STORAGE_KEY = 'seo_builder_credentials'
+
+export function loadCredentials(): Record<string, string> {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}')
+  } catch {
+    return {}
+  }
+}
 
 export function Settings() {
   const [values, setValues] = useState<Record<string, string>>({})
   const [visible, setVisible] = useState<Record<string, boolean>>({})
   const [saved, setSaved] = useState(false)
 
+  useEffect(() => {
+    setValues(loadCredentials())
+  }, [])
+
   const set = (k: string, v: string) => setValues((prev) => ({ ...prev, [k]: v }))
   const toggle = (k: string) => setVisible((prev) => ({ ...prev, [k]: !prev[k] }))
 
-  const handleSave = async () => {
-    // POST to backend to update .env — this is a dev-time helper
-    await fetch('/api/settings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(values),
-    })
+  const handleSave = () => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(values))
     setSaved(true)
     setTimeout(() => setSaved(false), 3000)
+  }
+
+  const handleClear = () => {
+    localStorage.removeItem(STORAGE_KEY)
+    setValues({})
   }
 
   return (
     <div className="max-w-xl mx-auto space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-white">Settings</h1>
-        <p className="text-slate-400 text-sm mt-1">API keys and WordPress credentials</p>
+        <p className="text-slate-400 text-sm mt-1">Your credentials are saved in this browser only — never sent to our server.</p>
       </div>
 
-      <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 text-sm text-amber-300">
-        These values are written to your <code className="font-mono">.env</code> file on the server. Do not expose this page publicly.
+      <div className="bg-sky-500/10 border border-sky-500/20 rounded-xl p-4 text-sm text-sky-300">
+        Credentials are stored in <strong>localStorage</strong> and sent directly with each request. Each user brings their own keys.
       </div>
 
       {SECTIONS.map((section) => (
         <div key={section.heading} className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-5">
           <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500">{section.heading}</h2>
           {section.fields.map((f) => (
-          <div key={f.key}>
-            <label className="text-xs text-slate-400 mb-1.5 block font-medium">{f.label}</label>
-            <div className="relative">
-              <input
-                type={f.secret && !visible[f.key] ? 'password' : 'text'}
-                value={values[f.key] ?? ''}
-                onChange={(e) => set(f.key, e.target.value)}
-                placeholder={f.placeholder}
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-200 placeholder-slate-600 outline-none focus:border-sky-500 transition-colors pr-10"
-              />
-              {f.secret && (
-                <button
-                  onClick={() => toggle(f.key)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
-                >
-                  {visible[f.key] ? <EyeOff size={14} /> : <Eye size={14} />}
-                </button>
-              )}
+            <div key={f.key}>
+              <label className="text-xs text-slate-400 mb-1.5 block font-medium">{f.label}</label>
+              <div className="relative">
+                <input
+                  type={f.secret && !visible[f.key] ? 'password' : 'text'}
+                  value={values[f.key] ?? ''}
+                  onChange={(e) => set(f.key, e.target.value)}
+                  placeholder={f.placeholder}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-200 placeholder-slate-600 outline-none focus:border-sky-500 transition-colors pr-10"
+                />
+                {f.secret && (
+                  <button
+                    onClick={() => toggle(f.key)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
+                  >
+                    {visible[f.key] ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                )}
+              </div>
+              {f.hint && <p className="text-xs text-slate-600 mt-1">{f.hint}</p>}
             </div>
-            {f.hint && <p className="text-xs text-slate-600 mt-1">{f.hint}</p>}
-          </div>
           ))}
         </div>
       ))}
 
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-3">
         <button
           onClick={handleSave}
           className="w-full flex items-center justify-center gap-2 bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold rounded-lg py-3 text-sm transition-colors"
         >
-          {saved ? (
-            <>
-              <CheckCircle size={16} /> Saved
-            </>
-          ) : (
-            <>
-              <Save size={16} /> Save to .env
-            </>
-          )}
+          {saved ? <><CheckCircle size={16} /> Saved to browser</> : <><Save size={16} /> Save to browser</>}
+        </button>
+        <button
+          onClick={handleClear}
+          className="w-full text-slate-500 hover:text-red-400 text-sm transition-colors py-1"
+        >
+          Clear all credentials
         </button>
       </div>
 

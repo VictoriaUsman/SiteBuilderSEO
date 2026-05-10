@@ -43,8 +43,18 @@ export interface GeneratePayload {
 
 const BASE = ''
 
+function getCredentials(): Record<string, string> {
+  try {
+    return JSON.parse(localStorage.getItem('seo_builder_credentials') || '{}')
+  } catch {
+    return {}
+  }
+}
+
 export async function startJob(payload: GeneratePayload): Promise<{ job_id: string }> {
+  const creds = getCredentials()
   const fd = new FormData()
+
   const csv = ['keyword,city,service', ...payload.rows.map(r => `${r.keyword},${r.city},${r.service}`)].join('\n')
   fd.append('csv_file', new Blob([csv], { type: 'text/csv' }), 'keywords.csv')
   fd.append('domain', payload.domain)
@@ -52,6 +62,11 @@ export async function startJob(payload: GeneratePayload): Promise<{ job_id: stri
   fd.append('status', payload.status)
   fd.append('post_type', payload.post_type)
   fd.append('dry_run', String(payload.dry_run))
+
+  // Attach user credentials — backend uses these over server env vars if present
+  const credFields = ['WP_ACCESS_TOKEN', 'WP_SITE', 'WP_URL', 'WP_USERNAME', 'WP_APP_PASSWORD',
+                      'GEMINI_API_KEY', 'OPENAI_API_KEY', 'PEXELS_API_KEY']
+  credFields.forEach(k => { if (creds[k]) fd.append(k, creds[k]) })
 
   const res = await fetch(`${BASE}/generate`, { method: 'POST', body: fd })
   if (!res.ok) throw new Error(await res.text())

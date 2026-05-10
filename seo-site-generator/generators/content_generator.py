@@ -19,10 +19,10 @@ def _parse_json_response(text: str) -> dict:
     return json.loads(text.strip())
 
 
-def generate_page_gemini(keyword: str, city: str, service: str, domain: str) -> dict:
+def generate_page_gemini(keyword: str, city: str, service: str, domain: str, api_key: str = None) -> dict:
     import google.generativeai as genai
 
-    genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+    genai.configure(api_key=api_key or os.getenv("GEMINI_API_KEY"))
     model = genai.GenerativeModel("gemini-1.5-flash")
 
     prompt = LOCAL_SEO_PAGE.format(
@@ -32,10 +32,10 @@ def generate_page_gemini(keyword: str, city: str, service: str, domain: str) -> 
     return _parse_json_response(response.text)
 
 
-def generate_page_openai(keyword: str, city: str, service: str, domain: str) -> dict:
+def generate_page_openai(keyword: str, city: str, service: str, domain: str, api_key: str = None) -> dict:
     from openai import OpenAI
 
-    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    client = OpenAI(api_key=api_key or os.getenv("OPENAI_API_KEY"))
     prompt = LOCAL_SEO_PAGE.format(
         service=service, city=city, keyword=keyword, domain=domain, min_words=MIN_WORD_COUNT
     )
@@ -47,8 +47,9 @@ def generate_page_openai(keyword: str, city: str, service: str, domain: str) -> 
     return json.loads(response.choices[0].message.content)
 
 
-def generate_page(keyword: str, city: str, service: str, domain: str, provider: Optional[str] = None) -> dict:
+def generate_page(keyword: str, city: str, service: str, domain: str, provider: Optional[str] = None,
+                  gemini_key: str = None, openai_key: str = None) -> dict:
     p = (provider or AI_PROVIDER).lower()
     if p == "openai":
-        return generate_page_openai(keyword, city, service, domain)
-    return generate_page_gemini(keyword, city, service, domain)
+        return generate_page_openai(keyword, city, service, domain, api_key=openai_key)
+    return generate_page_gemini(keyword, city, service, domain, api_key=gemini_key)

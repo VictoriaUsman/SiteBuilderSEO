@@ -53,17 +53,38 @@ async def generate(
     status: str = Form("draft"),
     post_type: str = Form("posts"),
     dry_run: str = Form("false"),
+    # Per-user credential overrides (from browser localStorage)
+    WP_ACCESS_TOKEN: str = Form(""),
+    WP_SITE: str = Form(""),
+    WP_URL: str = Form(""),
+    WP_USERNAME: str = Form(""),
+    WP_APP_PASSWORD: str = Form(""),
+    GEMINI_API_KEY: str = Form(""),
+    OPENAI_API_KEY: str = Form(""),
+    PEXELS_API_KEY: str = Form(""),
 ):
     job_id = str(uuid.uuid4())[:8]
     content = await csv_file.read()
     df = pd.read_csv(io.StringIO(content.decode()))
     rows = df.fillna("").to_dict(orient="records")
 
+    # Build credential dict — user values take priority over server env
+    creds = {
+        "WP_ACCESS_TOKEN": WP_ACCESS_TOKEN or os.getenv("WP_ACCESS_TOKEN", ""),
+        "WP_SITE": WP_SITE or os.getenv("WP_SITE", ""),
+        "WP_URL": WP_URL or os.getenv("WP_URL", ""),
+        "WP_USERNAME": WP_USERNAME or os.getenv("WP_USERNAME", ""),
+        "WP_APP_PASSWORD": WP_APP_PASSWORD or os.getenv("WP_APP_PASSWORD", ""),
+        "GEMINI_API_KEY": GEMINI_API_KEY or os.getenv("GEMINI_API_KEY", ""),
+        "OPENAI_API_KEY": OPENAI_API_KEY or os.getenv("OPENAI_API_KEY", ""),
+        "PEXELS_API_KEY": PEXELS_API_KEY or os.getenv("PEXELS_API_KEY", ""),
+    }
+
     is_dry = dry_run.lower() in ("true", "1", "yes")
     jobs[job_id] = {"id": job_id, "domain": domain, "status": "running", "logs": [], "pages": []}
     job_sockets[job_id] = []
 
-    asyncio.create_task(_run_job(job_id, rows, domain, provider, status, post_type, is_dry))
+    asyncio.create_task(_run_job(job_id, rows, domain, provider, status, post_type, is_dry, creds))
 
     return JSONResponse({"job_id": job_id, "message": f"Job {job_id} started"})
 
@@ -121,7 +142,7 @@ async def _broadcast(job_id: str):
 
 # ── Job runner ─────────────────────────────────────────────────────────────────
 
-async def _run_job(job_id: str, rows: list[dict], domain: str, provider: str, status: str, post_type: str, dry_run: bool):
+async def _run_job(job_id: str, rows: list[dict], domain: str, provider: str, status: str, post_type: str, dry_run: bool, creds: dict = {}):
     from generators.async_generator import generate_pages_async
     from seo.validator import validate_page
     from seo.linking import InternalLinkGraph
@@ -135,7 +156,9 @@ async def _run_job(job_id: str, rows: list[dict], domain: str, provider: str, st
         log(f"Generating {len(rows)} pages...")
         await _broadcast(job_id)
 
-        results = await generate_pages_async(rows, domain, provider)
+        results = await generate_pages_async(rows, domain, provider,
+                                              gemini_key=creds.get("GEMINI_API_KEY"),
+                                              openai_key=creds.get("OPENAI_API_KEY"))
 
         graph = InternalLinkGraph()
         for r in results:
@@ -151,7 +174,13 @@ async def _run_job(job_id: str, rows: list[dict], domain: str, provider: str, st
 
         if not dry_run:
             from wordpress.client import WordPressClient
-            client = WordPressClient()
+            client = WordPressClient(
+                url=creds.get("WP_URL"),
+                username=creds.get("WP_USERNAME"),
+                app_password=creds.get("WP_APP_PASSWORD"),
+                access_token=creds.get("WP_ACCESS_TOKEN"),
+                site=creds.get("WP_SITE"),
+            )
             if not client.test_connection():
                 log("ERROR: WordPress connection failed")
                 job["status"] = "failed"
@@ -176,6 +205,7 @@ async def _run_job(job_id: str, rows: list[dict], domain: str, provider: str, st
                     content.get("image_search_query", ""),
                     row.get("service", ""),
                     row.get("city", ""),
+                    api_key=creds.get("PEXELS_API_KEY"),
                 )
                 media_id = upload_image(client, img_path, content.get("image_alt_text", "")) if img_path else None
                 page = create_page(client, content, media_id, domain, status=status, post_type=post_type)
