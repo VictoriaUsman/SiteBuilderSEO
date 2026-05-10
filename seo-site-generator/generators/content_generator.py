@@ -23,7 +23,7 @@ def generate_page_gemini(keyword: str, city: str, service: str, domain: str, api
     import google.generativeai as genai
 
     genai.configure(api_key=api_key or os.getenv("GEMINI_API_KEY"))
-    model = genai.GenerativeModel("gemini-1.5-flash")
+    model = genai.GenerativeModel("gemini-2.0-flash")
 
     prompt = LOCAL_SEO_PAGE.format(
         service=service, city=city, keyword=keyword, domain=domain, min_words=MIN_WORD_COUNT
