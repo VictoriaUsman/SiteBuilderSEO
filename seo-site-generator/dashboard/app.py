@@ -37,6 +37,8 @@ ENV_FILE = Path(".env")
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
+    if FRONTEND_DIST.exists():
+        return FileResponse(FRONTEND_DIST / "index.html")
     return templates.TemplateResponse("index.html", {"request": request, "jobs": list(jobs.values())})
 
 
