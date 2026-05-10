@@ -5,23 +5,26 @@ import uuid
 from pathlib import Path
 
 import pandas as pd
-from dotenv import set_key, dotenv_values
+from dotenv import set_key
 from fastapi import FastAPI, File, Form, Request, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 app = FastAPI(title="AI SEO Site Builder")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:8000"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 templates = Jinja2Templates(directory="dashboard/templates")
+
+FRONTEND_DIST = Path("frontend/dist")
 
 # In-memory store
 jobs: dict[str, dict] = {}
@@ -192,3 +195,13 @@ async def _run_job(job_id: str, rows: list[dict], domain: str, provider: str, st
         job["status"] = "failed"
         job["logs"].append(f"ERROR: {e}")
         await _broadcast(job_id)
+
+
+# ── Serve React frontend (must be last) ────────────────────────────────────────
+
+if FRONTEND_DIST.exists():
+    app.mount("/assets", StaticFiles(directory=FRONTEND_DIST / "assets"), name="assets")
+
+    @app.get("/{full_path:path}", response_class=HTMLResponse, include_in_schema=False)
+    async def serve_react(full_path: str):
+        return FileResponse(FRONTEND_DIST / "index.html")
