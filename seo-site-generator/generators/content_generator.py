@@ -20,15 +20,18 @@ def _parse_json_response(text: str) -> dict:
 
 
 def generate_page_gemini(keyword: str, city: str, service: str, domain: str, api_key: str = None) -> dict:
-    import google.generativeai as genai
+    from google import genai
+    from google.genai import types
 
-    genai.configure(api_key=api_key or os.getenv("GEMINI_API_KEY"))
-    model = genai.GenerativeModel("gemini-2.0-flash")
-
+    client = genai.Client(api_key=api_key or os.getenv("GEMINI_API_KEY"))
     prompt = LOCAL_SEO_PAGE.format(
         service=service, city=city, keyword=keyword, domain=domain, min_words=MIN_WORD_COUNT
     )
-    response = model.generate_content(prompt)
+    response = client.models.generate_content(
+        model="gemini-2.0-flash",
+        contents=prompt,
+        config=types.GenerateContentConfig(response_mime_type="application/json"),
+    )
     return _parse_json_response(response.text)
 
 

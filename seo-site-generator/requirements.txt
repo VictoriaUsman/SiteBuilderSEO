@@ -2,7 +2,7 @@ pandas==2.2.2
 requests==2.32.3
 python-dotenv==1.0.1
 pyyaml==6.0.2
-google-generativeai==0.8.3
+google-genai>=1.0.0
 openai==1.54.4
 aiohttp==3.11.7
 asyncio-throttle==1.0.2
